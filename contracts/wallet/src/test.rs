@@ -4,7 +4,7 @@
 use soroban_sdk::symbol_short;
 use soroban_sdk::testutils::Events;
 
-use super::{WalletBinding, WalletContract, WalletContractClient};
+use super::{SCHEMA_VERSION, WalletBinding, WalletContract, WalletContractClient};
 use lily_common::PROTOCOL_VERSION;
 use lily_test_support::{test_address, test_env};
 
