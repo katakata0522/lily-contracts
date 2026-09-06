@@ -71,6 +71,7 @@ impl IdentityContract {
     }
 
     /// Return whether the contract has been initialized.
+    #[must_use]
     pub fn is_initialized(env: Env) -> bool {
         env.storage().instance().has(&DataKey::Initialized)
     }
@@ -208,6 +209,7 @@ impl IdentityContract {
     }
 
     /// Fetch a registered profile if it exists, returning `None` for missing records.
+    #[must_use]
     pub fn get_profile_opt(env: Env, agent: Address) -> Option<AgentProfile> {
         ensure_initialized(&env);
         bump_instance(&env);

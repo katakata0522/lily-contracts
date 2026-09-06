@@ -89,6 +89,7 @@ impl WalletContract {
     }
 
     /// Return whether the contract has been initialized.
+    #[must_use]
     pub fn is_initialized(env: Env) -> bool {
         env.storage().instance().has(&DataKey::Initialized)
     }
@@ -152,7 +153,11 @@ impl WalletContract {
         wallet.require_auth();
 
         let key = DataKey::Binding(agent.clone());
-        require(&env, env.storage().persistent().has(&key), ProtocolError::MissingRecord);
+        let prev: WalletBinding =
+            env.storage().persistent().get(&key).unwrap_or_else(|| {
+                soroban_sdk::panic_with_error!(&env, ProtocolError::MissingRecord)
+            });
+        let next_revision = checked_inc(&env, prev.revision);
 
         let binding = WalletBinding {
             wallet,
@@ -260,6 +265,7 @@ impl WalletContract {
     }
 
     /// Read the current binding for an agent if one exists, returning `None` otherwise.
+    #[must_use]
     pub fn get_binding_opt(env: Env, agent: Address) -> Option<WalletBinding> {
         ensure_initialized(&env);
         bump_instance(&env);

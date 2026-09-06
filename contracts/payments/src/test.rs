@@ -486,3 +486,39 @@ fn get_intent_opt_returns_none_for_unknown_and_some_for_cancelled_or_settled() {
     assert!(cancelled.is_some());
     assert_eq!(cancelled.unwrap().status, PaymentStatus::Cancelled);
 }
+
+#[test]
+fn rejects_initialize_with_non_pinned_admin() {
+    let env = test_env();
+    let pinned_admin = test_address(&env);
+    let non_pinned_admin = test_address(&env);
+    let treasury = test_address(&env);
+
+    let contract_id = env.register(PaymentsContract, (pinned_admin.clone(),));
+    let client = PaymentsContractClient::new(&env, &contract_id);
+
+    let result = client.try_initialize(&non_pinned_admin, &treasury, &50_u32);
+    assert_eq!(
+        result,
+        Err(Ok(Error::from_contract_error(lily_common::ProtocolError::Unauthorized as u32)))
+    );
+    assert!(!client.is_initialized());
+
+    // Positive path: pinned admin initializes successfully
+    client.initialize(&pinned_admin, &treasury, &50_u32);
+    assert!(client.is_initialized());
+}
+
+#[test]
+#[should_panic = "Error(Contract, #3)"]
+fn rejects_initialize_with_non_pinned_admin_panics() {
+    let env = test_env();
+    let pinned_admin = test_address(&env);
+    let non_pinned_admin = test_address(&env);
+    let treasury = test_address(&env);
+
+    let contract_id = env.register(PaymentsContract, (pinned_admin,));
+    let client = PaymentsContractClient::new(&env, &contract_id);
+
+    client.initialize(&non_pinned_admin, &treasury, &50_u32);
+}

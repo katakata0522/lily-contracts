@@ -45,6 +45,12 @@ impl ProtocolContract {
         env.storage().instance().set(&DataKey::PinnedAdmin, &initial_admin);
     }
 
+    /// Return the protocol version.
+    #[must_use]
+    pub fn version(_env: Env) -> u32 {
+        lily_common::PROTOCOL_VERSION
+    }
+
     /// Initialize protocol-wide configuration once.
     ///
     /// The initial admin must match the address pinned by the constructor at
@@ -79,6 +85,7 @@ impl ProtocolContract {
     }
 
     /// Return the contract schema version.
+    #[must_use]
     pub fn schema_version(env: Env) -> u32 {
         ensure_initialized(&env);
         bump_instance(&env);
@@ -98,6 +105,7 @@ impl ProtocolContract {
     }
 
     /// Return the pending admin address if a transfer is in progress.
+    #[must_use]
     pub fn get_pending_admin(env: Env) -> Option<Address> {
         ensure_initialized(&env);
         bump_instance(&env);

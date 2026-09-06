@@ -10,10 +10,12 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, unwrap::UnwrapOptimized, Address, Env,
     String, Vec,
 };
-use wallet::WalletContractClient;
 
 #[contract]
 pub struct PaymentsContract;
+
+/// Payments contract schema version.
+pub const SCHEMA_VERSION: u32 = 1;
 
 /// Largest payment amount that keeps future basis-point multiplication within i128.
 pub const MAX_PAYMENT_AMOUNT: i128 = i128::MAX / (MAX_BPS as i128);
@@ -91,6 +93,12 @@ impl PaymentsContract {
         env.storage().instance().set(&DataKey::PinnedAdmin, &initial_admin);
     }
 
+    /// Return the protocol version.
+    #[must_use]
+    pub fn version(_env: Env) -> u32 {
+        lily_common::PROTOCOL_VERSION
+    }
+
     /// Initialize settlement configuration once.
     ///
     /// The initial admin must match the address pinned by the constructor at
@@ -109,7 +117,6 @@ impl PaymentsContract {
         env.storage().instance().set(&DataKey::Treasury, &treasury);
         env.storage().instance().set(&DataKey::FeeBps, &fee_bps);
         env.storage().instance().set(&DataKey::NextIntentId, &1_u64);
-        env.storage().instance().set(&DataKey::Wallet, &wallet);
         env.storage().instance().set(&DataKey::Initialized, &true);
         bump_instance(&env);
 
@@ -148,11 +155,13 @@ impl PaymentsContract {
     }
 
     /// Return whether the contract has been initialized.
+    #[must_use]
     pub fn is_initialized(env: Env) -> bool {
         env.storage().instance().has(&DataKey::Initialized)
     }
 
     /// Return the contract schema version.
+    #[must_use]
     pub fn schema_version(env: Env) -> u32 {
         ensure_initialized(&env);
         bump_instance(&env);
@@ -161,7 +170,7 @@ impl PaymentsContract {
 
     /// Return the active payments configuration.
     #[must_use]
-    pub fn get_config(env: Env) -> PaymentsConfig {
+    pub fn get_config(env: Env) -> ProtocolConfig {
         ensure_initialized(&env);
         bump_instance(&env);
         PaymentsConfig {
@@ -174,6 +183,7 @@ impl PaymentsContract {
     }
 
     /// Return the next intent id counter.
+    #[must_use]
     pub fn get_next_intent_id(env: Env) -> u64 {
         ensure_initialized(&env);
         bump_instance(&env);
@@ -366,6 +376,7 @@ impl PaymentsContract {
     }
 
     /// Read an individual payment intent if it exists, returning `None` otherwise.
+    #[must_use]
     pub fn get_intent_opt(env: Env, intent_id: u64) -> Option<PaymentIntent> {
         ensure_initialized(&env);
         bump_instance(&env);

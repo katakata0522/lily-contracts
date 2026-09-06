@@ -7,7 +7,6 @@ fn cross_contract_config_parity_and_independent_control() {
     let env = test_env();
     let admin = test_address(&env);
     let treasury = test_address(&env);
-    let wallet = test_address(&env);
     let new_admin = test_address(&env);
 
     let protocol_id = env.register(ProtocolContract, (admin.clone(),));
@@ -17,7 +16,7 @@ fn cross_contract_config_parity_and_independent_control() {
     let payments_client = PaymentsContractClient::new(&env, &payments_id);
 
     protocol_client.initialize(&admin, &treasury, &100_u32);
-    payments_client.initialize(&admin, &treasury, &100_u32, &wallet);
+    payments_client.initialize(&admin, &treasury, &100_u32);
 
     let protocol_config = protocol_client.get_config();
     let payments_config = payments_client.get_config();
@@ -28,7 +27,6 @@ fn cross_contract_config_parity_and_independent_control() {
     assert_eq!(payments_config.treasury, treasury);
     assert_eq!(protocol_config.fee_bps, 100);
     assert_eq!(payments_config.fee_bps, 100);
-    assert_eq!(payments_config.wallet, wallet);
 
     protocol_client.transfer_admin(&new_admin);
     protocol_client.accept_admin();
@@ -49,7 +47,6 @@ fn independent_fee_updates() {
     let env = test_env();
     let admin = test_address(&env);
     let treasury = test_address(&env);
-    let wallet = test_address(&env);
 
     let protocol_id = env.register(ProtocolContract, (admin.clone(),));
     let payments_id = env.register(PaymentsContract, (admin.clone(),));
@@ -58,7 +55,7 @@ fn independent_fee_updates() {
     let payments_client = PaymentsContractClient::new(&env, &payments_id);
 
     protocol_client.initialize(&admin, &treasury, &100_u32);
-    payments_client.initialize(&admin, &treasury, &100_u32, &wallet);
+    payments_client.initialize(&admin, &treasury, &100_u32);
 
     protocol_client.set_fee_bps(&200_u32);
 

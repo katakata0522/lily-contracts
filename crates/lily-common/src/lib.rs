@@ -77,6 +77,38 @@ pub fn require(env: &Env, condition: bool, error: ProtocolError) {
     }
 }
 
+/// Checked increment for revision/id counters shared by contract crates.
+///
+/// # Panics
+/// Raises [`ProtocolError::ArithmeticOverflow`] when `value == u64::MAX`.
+#[must_use]
+pub fn checked_inc(env: &Env, value: u64) -> u64 {
+    value
+        .checked_add(1)
+        .unwrap_or_else(|| panic_with_error!(env, ProtocolError::ArithmeticOverflow))
+}
+
+/// Read a required value from instance storage.
+///
+/// This centralizes the fail-fast semantics used by configuration getters:
+/// missing required instance state is treated as a contract invariant failure.
+#[must_use]
+pub fn read_instance<K, V>(env: &Env, key: K) -> V
+where
+    K: IntoVal<Env, Val>,
+    V: TryFromVal<Env, Val>,
+{
+    env.storage()
+        .instance()
+        .get(&key)
+        .unwrap_or_else(|| panic_with_error!(env, ProtocolError::MissingRecord))
+}
+
+/// Require an enabled state before applying a state transition.
+pub fn require_enabled(env: &Env, enabled: bool) {
+    require(env, enabled, ProtocolError::InvalidInput);
+}
+
 /// Reject empty Soroban strings for storage-bound metadata fields.
 pub fn require_non_empty(env: &Env, len: u32) {
     require(env, len > 0, ProtocolError::InvalidInput);
@@ -202,7 +234,7 @@ pub fn bump_instance(env: &Env) {
 
 #[cfg(test)]
 mod test {
-    use super::{require_caller, NonReentrantGuard, ProtocolError};
+    use super::{checked_inc, require_caller, NonReentrantGuard, ProtocolError};
     use crate::require;
     use soroban_sdk::{
         contract, contractimpl, symbol_short, testutils::Address as _, Address, Env,
@@ -262,6 +294,20 @@ mod test {
 
     fn register(env: &Env) -> Address {
         env.register(Gatekeeper, ())
+    }
+
+    #[test]
+    fn checked_inc_increments_regular_values() {
+        let env = env();
+        assert_eq!(checked_inc(&env, 0), 1);
+        assert_eq!(checked_inc(&env, u64::MAX - 1), u64::MAX);
+    }
+
+    #[test]
+    #[should_panic = "Error(Contract, #11)"]
+    fn checked_inc_raises_typed_overflow() {
+        let env = env();
+        let _ = checked_inc(&env, u64::MAX);
     }
 
     #[test]
