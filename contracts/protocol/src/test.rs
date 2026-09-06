@@ -251,3 +251,35 @@ fn rejects_schema_version_before_initialization() {
     let client = ProtocolContractClient::new(&env, &contract_id);
     client.schema_version();
 }
+
+#[test]
+fn transfers_admin_and_emits_event() {
+    let env = test_env();
+    let admin = test_address(&env);
+    let treasury = test_address(&env);
+    let next_admin = test_address(&env);
+
+    let contract_id = env.register(ProtocolContract, ());
+    let client = ProtocolContractClient::new(&env, &contract_id);
+
+    client.initialize(&admin, &treasury, &100_u32);
+    client.transfer_admin(&next_admin);
+
+    let config = client.get_config();
+    assert_eq!(config.admin, next_admin);
+}
+
+#[test]
+#[should_panic]
+fn rejects_set_fee_bps_above_max() {
+    let env = test_env();
+    let admin = test_address(&env);
+    let treasury = test_address(&env);
+
+    let contract_id = env.register(ProtocolContract, ());
+    let client = ProtocolContractClient::new(&env, &contract_id);
+
+    client.initialize(&admin, &treasury, &100_u32);
+    client.set_fee_bps(&10_001_u32);
+}
+
