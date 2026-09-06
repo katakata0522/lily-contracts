@@ -6,7 +6,8 @@ use soroban_sdk::Address;
 
 use super::{AgentProfile, DataKey, IdentityContract, IdentityContractClient};
 use lily_test_support::{soroban_string, test_address, test_env};
-use soroban_sdk::{FromVal, IntoVal, Symbol, Val, Vec};
+use soroban_sdk::testutils::{Events, MockAuth, MockAuthInvoke};
+use soroban_sdk::{symbol_short, FromVal, IntoVal, Symbol, TryIntoVal, Val, Vec};
 
 #[test]
 fn data_key_encodings_are_stable() {
