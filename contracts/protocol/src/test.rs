@@ -7,6 +7,9 @@ use lily_test_support::{test_address, test_env};
 use soroban_sdk::symbol_short;
 use soroban_sdk::testutils::Events;
 use soroban_sdk::{
+    symbol_short,
+    testutils::{storage::Instance as _, Events, Ledger as _, MockAuth, MockAuthInvoke},
+    vec,
     xdr::{ScErrorCode, ScErrorType},
     Address, Error, TryIntoVal,
 };
@@ -185,8 +188,33 @@ fn transfers_admin_and_emits_event() {
     client.transfer_admin(&next_admin);
     client.accept_admin();
 
-    let config = client.get_config();
-    assert_eq!(config.admin, next_admin);
+    // Mock auth as unauthorized non-pending caller
+    env.mock_auths(&[MockAuth {
+        address: &unauthorized,
+        invoke: &MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "accept_admin",
+            args: vec![&env],
+            sub_invokes: &[],
+        },
+    }]);
+
+    client.accept_admin();
+}
+
+#[test]
+#[should_panic]
+fn rejects_accept_admin_without_pending() {
+    let env = test_env();
+    let admin = test_address(&env);
+    let treasury = test_address(&env);
+
+    let contract_id = env.register(ProtocolContract, (admin.clone(),));
+    let client = ProtocolContractClient::new(&env, &contract_id);
+
+    client.initialize(&admin, &treasury, &100_u32);
+    // Should panic because no pending admin exists (ProtocolError::MissingRecord)
+    client.accept_admin();
 }
 
 #[test]

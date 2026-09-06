@@ -8,6 +8,7 @@ use lily_common::{
 };
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, unwrap::UnwrapOptimized, Address, Env,
+    TryFromVal, Val,
 };
 
 #[contract]
@@ -31,6 +32,7 @@ enum DataKey {
     /// Stores the schema version (`u32`). Durability: Instance.
     SchemaVersion,
     PinnedAdmin,
+    SchemaVersion,
 }
 
 #[contractimpl]
@@ -90,13 +92,15 @@ impl ProtocolContract {
         bump_instance(&env);
         ProtocolConfig {
             admin: get_admin_internal(&env),
-            treasury: env.storage().instance().get(&DataKey::Treasury).unwrap_optimized(),
-            fee_bps: env.storage().instance().get(&DataKey::FeeBps).unwrap_optimized(),
+            treasury: read_instance(&env, DataKey::Treasury),
+            fee_bps: read_instance(&env, DataKey::FeeBps),
         }
     }
 
     /// Return the pending admin address if a transfer is in progress.
     pub fn get_pending_admin(env: Env) -> Option<Address> {
+        ensure_initialized(&env);
+        bump_instance(&env);
         env.storage().instance().get(&DataKey::PendingAdmin)
     }
 
