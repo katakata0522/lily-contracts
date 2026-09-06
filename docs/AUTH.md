@@ -1,18 +1,14 @@
 # Authorization Model
 
-This document is the function-by-function authorization matrix for Lily Protocol.
-Every `require_auth()` call site in the workspace is listed, along with the
-reasoning behind each choice. The model separates **protocol governance**
-(admin), **agent lifecycle** (the agent itself), **delegated control**
-(controller), and **funding/policy ownership** (payer, wallet) so that each
-address holds only the minimum authority its role requires.
+This document is the function-by-function authorization matrix for Lily Protocol. It mirrors the current contract entrypoints and their `require_auth()` / `require_auth_or_error()` / typed role checks. The model separates **protocol governance** (admin), **agent lifecycle** (the agent itself), **delegated control** (controller), and **funding/policy ownership** (payer, wallet) so each address holds only the authority required for its role.
 
 ## Vocabulary
 
 | Role | Meaning |
 | --- | --- |
-| `admin` | The protocol's governance address, stored at initialization per contract. |
-| initializer | The address passed to `initialize`; authorized exactly once to set the initial value. |
+| `admin` | The governance address stored by a contract after initialization. |
+| pinned admin | The address stored by `__constructor` under `PinnedAdmin` for contracts that enforce deploy-time bootstrap identity. |
+| pending admin | The address proposed by protocol `transfer_admin` and allowed to complete the two-step handover with `accept_admin`. |
 | `agent` | A registered Lily agent (an `Address` with a profile). |
 | `controller` | The address delegated by an agent to manage its profile. |
 | `payer_agent` | The agent that opens a payment intent and funds it. |
@@ -24,7 +20,8 @@ Views (`*get_*`, `is_initialized`, `schema_version`) require no authorization: t
 
 | Function | Required authorization | Why |
 | --- | --- | --- |
-| `initialize` | initializer admin | One-shot bootstrap; the address chosen at deploy time becomes admin. |
+| `__constructor` | none inside the contract | Records the deploy-time `initial_admin` as `PinnedAdmin`; constructor invocation is part of deployment rather than an authenticated runtime governance call. |
+| `initialize` | submitted admin, which must also equal the pinned admin | The submitted admin signs the bootstrap call, and `require_initial_admin` rejects an address different from the one pinned at deployment. |
 | `is_initialized` | none | Read-only bootstrap probe. |
 | `schema_version` | none | Read-only schema contract version view. |
 | `get_config` | none | Read-only view; consumers poll it constantly. |
@@ -82,18 +79,12 @@ Governance handover uses a two-step pattern (`transfer_admin` followed by `accep
 | `get_intent` | none | Read-only view used by payees and operators. |
 | `get_intent_opt` | none | Read-only optional view returning `Option<PaymentIntent>`. |
 
-## Cross-cutting invariants
+## Cross-cutting authorization invariants
 
-1. **Auth before state checks.** `initialize` enforces one-time semantics via a
-   `has(Initialized)` check *and* `require_auth()` on the initializer; views
-   check `ensure_initialized` first so they fail with `NotInitialized` rather
-   than reading empty state.
-2. **Stored principals, not call arguments.** Every admin-gated function re-reads
-   the `Admin` storage key instead of trusting an `admin` argument, so the
-   current holder of record is the only valid signer.
-3. **Delegation is per-record.** The controller is stored inside the agent's
-   `AgentProfile`; changing controllers goes through the controller-authorized
-   `update_profile` path, keeping delegation revocable by the current controller.
-4. **Payer capture at creation.** `PaymentIntent.payer_agent` is written once by
-   `create_intent` and then used for every later `cancel` auth check, so the
-   payer's authority is fixed at commitment time.
+1. **Stored principals gate privileged actions.** After initialization, admin-gated functions read the current `Admin` value from contract storage rather than trusting an arbitrary admin argument.
+2. **Protocol handover is two-step.** The old protocol admin remains active after `transfer_admin`; only the stored pending admin may call `accept_admin`, after which the pending key is removed.
+3. **Payments handover is currently single-step.** Its `transfer_admin` directly replaces the stored admin, so it should not be assumed to share protocol's pending-accept semantics.
+4. **Identity delegation is per profile.** `update_profile` authenticates the controller stored on that `AgentProfile`; controller rotation therefore changes who can authorize later edits.
+5. **Wallet binding and rebinding are dual-consent operations.** Both the agent and the wallet being bound authenticate, while later policy updates are agent-authorized and emergency deactivation is admin-authorized.
+6. **Payer authority is captured at intent creation.** `create_intent` authenticates the payer agent, and `cancel_intent` later authenticates the payer address stored on that intent.
+7. **Typed role and signature failures are distinct where both are used.** `payments::settle_intent` checks that `caller` equals the stored admin with a typed `Unauthorized` error before requiring that caller's cryptographic authorization.
