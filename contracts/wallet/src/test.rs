@@ -19,6 +19,19 @@ fn returns_protocol_version() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn rejects_unpinned_admin_initialization() {
+    let env = test_env();
+    let deployer = test_address(&env);
+    let other = test_address(&env);
+
+    let contract_id = env.register(WalletContract, (deployer,));
+    let client = WalletContractClient::new(&env, &contract_id);
+
+    client.initialize(&other);
+}
+
+#[test]
 fn binds_wallet_and_updates_policy() {
     let env = test_env();
     let admin = test_address(&env);
