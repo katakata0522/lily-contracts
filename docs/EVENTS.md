@@ -8,10 +8,10 @@ This document lists every event emitted by the Lily Protocol contracts, grouped 
 |---|---|---|---|
 | `("init", admin)` | `IdentityConfig` | `initialize(env, admin)` | `admin: Address` |
 | `("register", agent)` | `AgentProfile` | `register(env, agent, controller, metadata_uri)` | `controller: Address`, `metadata_uri: String`, `active: bool`, `revision: u64` |
-| `("metadata_updated", agent)` | `String` | `update_profile(env, agent, metadata_uri, new_controller)` | The updated metadata URI. Emitted only when metadata actually changes. |
-| `("controller_rotated", agent)` | `Address` | `update_profile(env, agent, metadata_uri, new_controller)` | The updated controller address. Emitted only when the controller actually changes. |
-| `("deact", agent)` | `AgentProfile` | `deactivate(env, agent)` | Profile after `active` is set to `false`. Repeated deactivation of an already-inactive profile emits nothing. |
-| `("react", agent)` | `AgentProfile` | `reactivate(env, agent)` | Profile after `active` is set to `true`. |
+| `("metadata_updated", agent)` | `String` | `update_profile(env, agent, metadata_uri, new_controller)` | New metadata URI (emitted only when `metadata_uri` changed). |
+| `("controller_rotated", agent)` | `Address` | `update_profile(env, agent, metadata_uri, new_controller)` | New controller address (emitted only when `controller` changed). |
+| `("deact", agent)` | `AgentProfile` | `deactivate(env, agent)` | Profile after `active` has been set to `false`. |
+| `("react", agent)` | `AgentProfile` | `reactivate(env, agent)` | Profile after `active` has been set to `true` and `revision` incremented. |
 
 ## `contracts/protocol`
 
@@ -20,33 +20,31 @@ This document lists every event emitted by the Lily Protocol contracts, grouped 
 | `("init", admin)` | `ProtocolConfig` | `initialize(env, admin, treasury, fee_bps)` | `admin: Address`, `treasury: Address`, `fee_bps: u32` |
 | `("fee", admin)` | `u32` | `set_fee_bps(env, fee_bps)` | The new fee value in basis points. |
 | `("treasury", admin)` | `Address` | `set_treasury(env, treasury)` | The new treasury address. |
-| `("propose", admin)` | `Address` | `transfer_admin(env, new_admin)` | The proposed pending-admin address. The topic admin is the current admin that initiated the handover. |
-| `("admin", old_admin)` | `Address` | `accept_admin(env)` | The accepted new admin address. The topic records the admin being replaced. |
+| `("propose", admin)` | `Address` | `transfer_admin(env, new_admin)` | The proposed new admin address set in `DataKey::PendingAdmin`. |
+| `("admin", old_admin)` | `Address` | `accept_admin(env)` | The accepted new admin address after `DataKey::Admin` is updated. |
 
 ## `contracts/payments`
 
 | Topic | Payload type | Trigger function | Payload fields / meaning |
 |---|---|---|---|
-| `("init", admin)` | `PaymentsConfig` | `initialize(env, admin, treasury, fee_bps)` | Snapshot constructed with `admin: Address`, `treasury: Address`, `fee_bps: u32`, `next_intent_id: u64`. |
-| `("create", id)` | `PaymentIntent` | `create_intent(env, payer_agent, payee_agent, amount, memo)` | `id: u64`, `payer_agent: Address`, `payee_agent: Address`, `amount: i128`, `memo: String`, `settlement_reference: String`, `status: PaymentStatus`, `created_at: u64` |
-| `("settle", id, prior_status)` | `PaymentIntent` | `settle_intent(env, caller, intent_id, settlement_reference)` | Intent after `status` becomes `Settled` and the settlement reference is recorded. `prior_status` is produced by `payment_status_symbol`; successful settlement currently transitions from `pending`. |
-| `("cancel", id, prior_status)` | `PaymentIntent` | `cancel_intent(env, intent_id)` | Intent after `status` becomes `Cancelled`. `prior_status` is produced by `payment_status_symbol`; successful cancellation currently transitions from `pending`. |
+| `("init", admin)` | `PaymentsConfig` | `initialize(env, admin, treasury, fee_bps)` | `admin: Address`, `treasury: Address`, `fee_bps: u32` |
+| `("create", id)` | `PaymentIntent` | `create_intent(...)` | `id: u64`, `payer_agent: Address`, `payee_agent: Address`, `amount: i128`, `memo: String`, `settlement_reference: String`, `status: PaymentStatus` |
+| `("settle", id, prior_status)` | `PaymentIntent` | `settle_intent(env, caller, intent_id, settlement_reference)` | Intent after `status` is set to `Settled` and the settlement reference is recorded. Third topic element carries prior status symbol (e.g. `"pending"`). |
+| `("cancel", id, prior_status)` | `PaymentIntent` | `cancel_intent(env, intent_id)` | Intent after `status` is set to `Cancelled`. Third topic element carries prior status symbol (e.g. `"pending"`). |
 | `("fee", admin)` | `u32` | `set_fee_bps(env, fee_bps)` | The new fee value in basis points. |
 | `("treasury", admin)` | `Address` | `set_treasury(env, treasury)` | The new treasury address. |
-| `("admin", admin)` | `Address` | `transfer_admin(env, new_admin)` | The new payments admin address. The topic records the previous admin. |
-
-The third topic element on successful `settle` and `cancel` events is the pre-transition status symbol. The current mapping is `Pending -> "pending"`, `Settled -> "settled"`, and `Cancelled -> "cancelled"`. Because finalization rejects non-pending intents, successful finalization events currently carry `"pending"` there.
+| `("admin", admin)` | `Address` | `transfer_admin(env, new_admin)` | The new payments contract admin address. |
 
 ## `contracts/wallet`
 
 | Topic | Payload type | Trigger function | Payload fields / meaning |
 |---|---|---|---|
-| `("init",)` | `Address` | `initialize(env, admin)` | The wallet registry admin address. |
+| `("init", admin)` | `WalletConfig` | `initialize(env, admin)` | `admin: Address` |
 | `("bind", agent)` | `WalletBinding` | `bind_wallet(env, agent, wallet, settlement_asset, spend_limit)` | `wallet: Address`, `settlement_asset: Symbol`, `spend_limit: i128`, `enabled: bool`, `revision: u64` |
-| `("rebind", agent)` | `WalletBinding` | `rebind_wallet(env, agent, wallet, settlement_asset, spend_limit)` | The replacement binding written for an already-bound agent. |
+| `("rebind", agent)` | `WalletBinding` | `rebind_wallet(env, agent, new_wallet)` | Binding after `wallet` is updated to `new_wallet` and `revision` is incremented. |
 | `("limit", agent)` | `WalletBinding` | `update_spend_limit(env, agent, spend_limit)` | Binding after the spend limit is updated and `revision` is incremented. |
-| `("state", agent)` | `WalletBinding` | `set_enabled(env, agent, enabled)` | Binding after `enabled` is changed and `revision` is incremented. |
-| `("adm_deact", agent)` | `WalletBinding` | `admin_deactivate(env, agent)` | Binding after an admin emergency-deactivation sets `enabled` to `false`. |
+| `("state", agent)` | `WalletBinding` | `set_enabled(env, agent, enabled)` | Binding after `enabled` is toggled and `revision` is incremented. |
+| `("adm_deact", agent)` | `WalletBinding` | `admin_deactivate(env, agent)` | Binding after admin forces `enabled` to `false` and increments `revision`. |
 
 ## Common payload types
 
@@ -77,11 +75,11 @@ pub struct AgentProfile {
 }
 
 // contracts/payments/src/lib.rs
-// initialize currently constructs its PaymentsConfig event snapshot with:
-// admin: Address
-// treasury: Address
-// fee_bps: u32
-// next_intent_id: u64
+pub struct PaymentsConfig {
+    pub admin: Address,
+    pub treasury: Address,
+    pub fee_bps: u32,
+}
 
 pub struct PaymentIntent {
     pub id: u64,
