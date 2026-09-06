@@ -202,6 +202,10 @@ impl WalletContract {
         admin.require_auth();
 
         let mut binding = get_binding_internal(&env, &agent);
+        if !binding.enabled {
+            return;
+        }
+
         binding.enabled = false;
         binding.admin_locked = true;
         binding.revision = checked_inc(&env, binding.revision);
